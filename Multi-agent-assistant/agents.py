@@ -3,6 +3,16 @@ from typing import Literal
 from llm import llm
 from state import AssistantState
 
+from langchain_core.messages import AIMessage
+
+def get_conversation(state: AssistantState):
+
+    conversation = ""
+
+    for message in state["message"]:
+        conversation += f"{message.type}: {message.content}\n"
+
+    return conversation
 
 def supervisor_agent(state: AssistantState):
     user_input = state["user_input"]
