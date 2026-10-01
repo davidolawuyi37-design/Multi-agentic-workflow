@@ -9,7 +9,7 @@ def get_conversation(state: AssistantState):
 
     conversation = ""
 
-    for message in state["message"]:
+    for message in state["messages"]:
         conversation += f"{message.type}: {message.content}\n"
 
     return conversation

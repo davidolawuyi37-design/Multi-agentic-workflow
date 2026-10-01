@@ -1,4 +1,4 @@
-from graph import assistant_graph
+from graph import AssistantState, assistant_graph
 
 print("=" * 50)
 print("MULTI-AGENT AI ASSISTANT")
@@ -15,12 +15,15 @@ while True:
         print("Assistant: Goodbye!")
         break
 
-    result = assistant_graph.invoke({
+    state: AssistantState = {
+        "messages": [],
         "user_input": user_input,
         "route": "",
         "specialist_response": "",
         "final_response": ""
-    })
+    }
+
+    result = assistant_graph.invoke(state)
 
     print()
     print("Agent selected:", result["route"])
