@@ -1,12 +1,41 @@
 from typing import Literal
 
+from langchain_core.messages import AIMessage
+
 from llm import llm
 from state import AssistantState
 
-from langchain_core.messages import AIMessage
+
+def _extract_text(content):
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                if "text" in item:
+                    parts.append(str(item["text"]))
+                elif "content" in item:
+                    parts.append(str(item["content"]))
+                else:
+                    parts.append(str(item))
+            else:
+                parts.append(str(item))
+        return "".join(parts)
+
+    if isinstance(content, dict):
+        if "text" in content:
+            return str(content["text"])
+        if "content" in content:
+            return str(content["content"])
+
+    return str(content)
+
 
 def get_conversation(state: AssistantState):
-
     conversation = ""
 
     for message in state["messages"]:
@@ -14,23 +43,51 @@ def get_conversation(state: AssistantState):
 
     return conversation
 
+
 def supervisor_agent(state: AssistantState):
-    user_input = state["user_input"]
+
+    conversation = get_conversation(state)
 
     prompt = f"""
-You are a supervisor for an AI assistant.
+You are the supervisor of a multi-agent AI assistant.
 
-Your job is to decide which specialist should handle the user's request.
+Study the conversation and determine which specialist should handle
+the user's latest request.
 
 Available specialists:
 
 explain
-plan
-write
-general
+- Explanations
+- Teaching
+- Educational questions
+- Technical concepts
 
-User request:
-{user_input}
+plan
+- Plans
+- Schedules
+- Steps
+- Strategies
+- Workflows
+
+write
+- Emails
+- Messages
+- Posts
+- Letters
+- Written content
+
+general
+- General questions
+- Casual questions
+- Anything that does not fit the other categories
+
+Conversation:
+
+{conversation}
+
+Latest user request:
+
+{state["user_input"]}
 
 Return only one word:
 
@@ -42,124 +99,164 @@ general
 
     response = llm.invoke(prompt)
 
+    route = _extract_text(response.content).strip().lower()
+
     return {
-        "route": (
-            response.content.strip()
-            if isinstance(response.content, str)
-            else "".join(str(part) for part in response.content).strip()
-        ).lower()
+        "route": route
     }
 
 
 def explain_agent(state: AssistantState):
-    user_input = state["user_input"]
+
+    conversation = get_conversation(state)
 
     prompt = f"""
-You are an expert teacher.
+You are the teaching specialist in a multi-agent AI assistant.
 
-Explain the user's request clearly and simply.
+Use the previous conversation when useful.
 
-Use examples where useful.
+Conversation:
 
-User request:
-{user_input}
+{conversation}
+
+Latest user request:
+
+{state["user_input"]}
+
+Explain the topic clearly and simply.
+
+Use examples when useful.
 """
+
     response = llm.invoke(prompt)
-    clean_response = response.content
 
     return {
-        "specialist_response": clean_response
+        "specialist_response": response.content
     }
+
 
 def planner_agent(state: AssistantState):
-    user_input = state["user_input"]
+
+    conversation = get_conversation(state)
 
     prompt = f"""
-You are a planning assistant.
+You are the planning specialist.
 
-Turn the user's request into a practical step-by-step plan.
+Use the conversation history when necessary.
 
-Keep the steps clear and actionable.
+Conversation:
 
-User request:
-{user_input}
+{conversation}
+
+Latest user request:
+
+{state["user_input"]}
+
+Create a practical and clear plan for the user.
 """
+
     response = llm.invoke(prompt)
-    clean_response = response.content
 
     return {
-        "specialist_response": clean_response
+        "specialist_response": response.content
     }
+
 
 def writer_agent(state: AssistantState):
-    user_input = state["user_input"]
+
+    conversation = get_conversation(state)
 
     prompt = f"""
-You are a professional writing assistant.
+You are the writing specialist.
 
-Create the content requested by the user.
+Use the previous conversation for context when needed.
 
-Make it natural, clear and appropriate for the request.
+Conversation:
 
-User request:
-{user_input}
+{conversation}
+
+Latest user request:
+
+{state["user_input"]}
+
+Create the written content requested by the user.
 """
+
     response = llm.invoke(prompt)
-    clean_response = response.content
 
     return {
-        "specialist_response": clean_response
+        "specialist_response": response.content
     }
+
 
 def general_agent(state: AssistantState):
-    user_input = state["user_input"]
+
+    conversation = get_conversation(state)
 
     prompt = f"""
-You are a helpful AI assistant.
+You are a helpful general AI assistant.
 
-Answer the following request clearly:
-User request:
-{user_input}
+Use the conversation history when relevant.
+
+Conversation:
+
+{conversation}
+
+Latest request:
+
+{state["user_input"]}
+
+Answer clearly.
 """
+
     response = llm.invoke(prompt)
-    clean_response = response.content
 
     return {
-        "specialist_response": clean_response
+        "specialist_response": response.content
     }
 
+
 def review_agent(state: AssistantState):
-    user_input = state["user_input"]
-    draft = state["specialist_response"]
+
     prompt = f"""
-You are the final reviewer in an AI assistant system.
+You are the final reviewer of a multi-agent AI assistant.
 
 The user asked:
 
-{user_input}
+{state["user_input"]}
 
-Another agent produced this answer:
+The specialist produced:
 
-{draft}
+{state["specialist_response"]}
 
-Review the answer.
+Improve the answer.
 
-Fix:
-- unclear wording
-- missing important information
-- unnecessary repetition
-- obvious mistakes
+Check that it:
+
+- answers the user's request
+- is clear
+- avoids unnecessary repetition
+- corrects obvious mistakes
+- keeps important information
 
 Return only the improved final answer.
 """
+
     response = llm.invoke(prompt)
-    clean_response = response.content
+
+    final_answer = response.content
 
     return {
-        "final_response": clean_response
+        "final_response": final_answer,
+        "messages": [
+            AIMessage(content=final_answer)
+        ]
     }
 
-def route_request(state: AssistantState) -> Literal["explain", "plan", "write", "general"]:
+
+def route_request(
+    state: AssistantState
+) -> Literal["explain", "plan", "write", "general"]:
 
     route = state["route"]
 
@@ -171,8 +268,5 @@ def route_request(state: AssistantState) -> Literal["explain", "plan", "write", 
 
     if route == "write":
         return "write"
-
-    if route == "general":
-        return "general"
 
     return "general"

@@ -1,10 +1,18 @@
 from graph import AssistantState, assistant_graph
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.runnables.config import RunnableConfig
 
 print("=" * 50)
 print("MULTI-AGENT AI ASSISTANT")
 print("=" * 50)
 
 print("Type 'exit' to stop.\n")
+
+config: RunnableConfig = {
+    "configurable": {
+        "thread_id": "david-conversation"
+    }
+}
 
 
 while True:
@@ -15,19 +23,32 @@ while True:
         print("Assistant: Goodbye!")
         break
 
-    state: AssistantState = {
-        "messages": [],
-        "user_input": user_input,
-        "route": "",
-        "specialist_response": "",
-        "final_response": ""
-    }
 
-    result = assistant_graph.invoke(state)
+    result = assistant_graph.invoke(
+
+        {
+            "messages": [
+                HumanMessage(content=user_input)
+            ],
+
+            "user_input": user_input,
+
+            "route": "",
+
+            "specialist_response": "",
+
+            "final_response": ""
+        },
+
+        config=config
+    )
+
 
     print()
     print("Agent selected:", result["route"])
     print()
+
     print("Assistant:")
     print(result["final_response"])
+
     print()

@@ -1,4 +1,6 @@
 from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.memory import InMemorySaver
+
 from state import AssistantState
 from agents import(
     supervisor_agent,
@@ -35,7 +37,10 @@ builder.add_edge("explain", "review")
 builder.add_edge("plan", "review")
 builder.add_edge("write", "review")
 builder.add_edge("general", "review")
-
 builder.add_edge("review", END)
 
-assistant_graph = builder.compile()
+memory = InMemorySaver()
+
+assistant_graph = builder.compile(
+    checkpointer=memory
+)
